@@ -1,6 +1,7 @@
 import torch
 import cv2
 import numpy as np
+import inspect
 from PIL import Image, ImageDraw, ImageFilter
 
 LANCZOS = (Image.Resampling.LANCZOS if hasattr(Image, 'Resampling') else Image.LANCZOS)
@@ -20,7 +21,7 @@ def tensor2pil(image):
 
 def center_of_bbox(bbox):
     w, h = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    return bbox[0] + w/2, bbox[1] + h/2
+    return bbox[0] + w / 2, bbox[1] + h / 2
 
 
 def combine_masks(masks):
@@ -163,7 +164,7 @@ def normalize_region(limit, startp, size):
         new_endp = limit
     else:
         new_startp = startp
-        new_endp = min(limit, startp+size)
+        new_endp = min(limit, startp + size)
 
     return int(new_startp), int(new_endp)
 
@@ -177,8 +178,62 @@ def make_crop_region(w, h, bbox, crop_factor, crop_min_size=None):
     bbox_w = x2 - x1
     bbox_h = y2 - y1
 
-    crop_w = bbox_w * crop_factor
-    crop_h = bbox_h * crop_factor
+    # CE
+    MAX_RESOLUTION_FACE: int = 1024
+    MAX_RESOLUTION_SEGS: int = 2048
+
+    stack = inspect.stack()
+
+    # DEBUG
+    # print(stack)
+
+    if 'FaceDetailer' in str(stack):
+        print('FaceDetailer detected: force square aspect ratio.')
+
+        if bbox_w > bbox_h:
+            bbox_h = bbox_w
+        elif bbox_w < bbox_h:
+            bbox_w = bbox_h
+
+        crop_w = int(bbox_w * crop_factor)
+        crop_h = int(bbox_h * crop_factor)
+
+        if crop_w > crop_h:
+            crop_w = crop_h
+        elif crop_w < crop_h:
+            crop_h = crop_w
+
+        # - make sure 'crop size' lower than (w,h) before multiple of X check
+        min_dim = min(w, h)
+        limit_dim = min(min_dim, MAX_RESOLUTION_FACE)
+
+        if crop_w > limit_dim or crop_h > limit_dim:
+            crop_w = limit_dim
+            crop_h = limit_dim
+        # -
+    else:
+        crop_w = int(bbox_w * crop_factor)
+        crop_h = int(bbox_h * crop_factor)
+
+        # - make sure 'crop size' lower than (w,h) before multiple of X check
+        limit_dim = min(w, MAX_RESOLUTION_SEGS)
+        if crop_w > limit_dim:
+            crop_w = limit_dim
+        limit_dim = min(h, MAX_RESOLUTION_SEGS)
+        if crop_h > limit_dim:
+            crop_h = limit_dim
+        # -
+
+    # - multiple of X check
+    multiple_of = 8
+    # 8 is optimal for SD1.5 (8, 16, 32 etc.),
+    # but SDXL need 1024x1024 and so on (for now...)
+
+    crop_w = int(crop_w // multiple_of) * multiple_of
+    crop_h = int(crop_h // multiple_of) * multiple_of
+    # -
+
+    # CE
 
     if crop_min_size is not None:
         crop_w = max(crop_min_size, crop_w)
@@ -246,7 +301,7 @@ def scale_tensor_and_to_pil(w, h, image):
 def empty_pil_tensor(w=64, h=64):
     image = Image.new("RGB", (w, h))
     draw = ImageDraw.Draw(image)
-    draw.rectangle((0, 0, w-1, h-1), fill=(0, 0, 0))
+    draw.rectangle((0, 0, w - 1, h - 1), fill=(0, 0, 0))
     return pil2tensor(image)
 
 
@@ -262,5 +317,6 @@ class NonListIterable:
 class AnyType(str):
     def __ne__(self, __value: object) -> bool:
         return False
+
 
 any_typ = AnyType("*")
