@@ -155,7 +155,10 @@ function valueSendHandler(event) {
                 nodes[i].widgets[1].value = event.detail.value;
 
                 let typ = typeof event.detail.value;
-                if(typ != "number") {
+                if(typ == 'string') {
+                    nodes[i].widgets[0].value = "STRING";
+                }
+                else if(typ != "number") {
                     nodes[i].widgets[0].value = typeof event.detail.value;
                 }
                 else if(Number.isInteger(event.detail.value)) {
@@ -288,8 +291,8 @@ app.registerExtension({
         }
 
         if (nodeData.name === 'ImpactMakeImageList' || nodeData.name === 'ImpactMakeImageBatch' ||
-            nodeData.name === 'CombineRegionalPrompts' || nodeData.name === 'ImpactSwitch' ||
-            nodeData.name === 'LatentSwitch' || nodeData.name == 'SEGSSwitch') {
+            nodeData.name === 'CombineRegionalPrompts' || nodeData.name === 'ImpactCombineConditionings' ||
+            nodeData.name === 'ImpactSwitch' || nodeData.name === 'LatentSwitch' || nodeData.name == 'SEGSSwitch') {
             var input_name = "input";
 
             switch(nodeData.name) {
@@ -300,6 +303,10 @@ app.registerExtension({
 
             case 'CombineRegionalPrompts':
                 input_name = "regional_prompts";
+                break;
+
+            case 'ImpactCombineConditionings':
+                input_name = "conditioning";
                 break;
 
             case 'LatentSwitch':

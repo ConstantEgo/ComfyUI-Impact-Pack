@@ -19,6 +19,7 @@ import comfy
 from io import BytesIO
 import random
 
+
 @server.PromptServer.instance.routes.post("/upload/temp")
 async def upload_image(request):
     upload_dir = folder_paths.get_temp_directory()
@@ -221,6 +222,99 @@ async def segs_picker(request):
         image_bytes.seek(0)
 
         return web.Response(status=200, body=image_bytes, content_type='image/png', headers={"Content-Disposition": f"filename={node_id}{idx}.png"})
+
+    return web.Response(status=400)
+
+
+@server.PromptServer.instance.routes.get("/view/validate")
+async def view_validate(request):
+    if "filename" in request.rel_url.query:
+        filename = request.rel_url.query["filename"]
+        subfolder = request.rel_url.query["subfolder"]
+        filename, output_dir = folder_paths.annotated_filepath(filename)
+
+        if filename == '' or filename[0] == '/' or '..' in filename:
+            return web.Response(status=400)
+
+        file = os.path.join(output_dir, subfolder, filename)
+
+        if os.path.isfile(file):
+            return web.Response(status=200)
+
+    return web.Response(status=400)
+
+
+@server.PromptServer.instance.routes.get("/impact/validate/pb_id_image")
+async def view_validate(request):
+    if "id" in request.rel_url.query:
+        pb_id = request.rel_url.query["id"]
+
+        if pb_id not in core.preview_bridge_image_id_map:
+            return web.Response(status=400)
+
+        file = core.preview_bridge_image_id_map[pb_id]
+        if os.path.isfile(file):
+            return web.Response(status=200)
+
+    return web.Response(status=400)
+
+
+@server.PromptServer.instance.routes.get("/impact/set/pb_id_image")
+async def set_previewbridge_image(request):
+    if "filename" in request.rel_url.query:
+        node_id = request.rel_url.query["node_id"]
+        filename = request.rel_url.query["filename"]
+        path_type = request.rel_url.query["type"]
+        subfolder = request.rel_url.query["subfolder"]
+        filename, output_dir = folder_paths.annotated_filepath(filename)
+
+        if filename == '' or filename[0] == '/' or '..' in filename:
+            return web.Response(status=400)
+
+        if output_dir is None:
+            if path_type == 'input':
+                output_dir = folder_paths.get_input_directory()
+            elif path_type == 'output':
+                output_dir = folder_paths.get_output_directory()
+            else:
+                output_dir = folder_paths.get_temp_directory()
+
+        file = os.path.join(output_dir, subfolder, filename)
+        item = {
+            'filename': filename,
+            'type': path_type,
+            'subfolder': subfolder,
+        }
+        pb_id = core.set_previewbridge_image(node_id, file, item)
+
+        return web.Response(status=200, text=pb_id)
+
+    return web.Response(status=400)
+
+
+@server.PromptServer.instance.routes.get("/impact/get/pb_id_image")
+async def get_previewbridge_image(request):
+    if "id" in request.rel_url.query:
+        pb_id = request.rel_url.query["id"]
+
+        if pb_id in core.preview_bridge_image_id_map:
+            _, path_item = core.preview_bridge_image_id_map[pb_id]
+            return web.json_response(path_item)
+
+    return web.Response(status=400)
+
+
+@server.PromptServer.instance.routes.get("/impact/view/pb_id_image")
+async def view_previewbridge_image(request):
+    if "id" in request.rel_url.query:
+        pb_id = request.rel_url.query["id"]
+
+        if pb_id in core.preview_bridge_image_id_map:
+            file = core.preview_bridge_image_id_map[pb_id]
+
+            with Image.open(file) as img:
+                filename = os.path.basename(file)
+                return web.FileResponse(file, headers={"Content-Disposition": f"filename=\"{filename}\""})
 
     return web.Response(status=400)
 
