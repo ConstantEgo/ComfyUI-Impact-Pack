@@ -153,6 +153,7 @@ NODE_CLASS_MAPPINGS = {
     "CfgScheduleHookProvider": CfgScheduleHookProvider,
     "NoiseInjectionHookProvider": NoiseInjectionHookProvider,
     "NoiseInjectionDetailerHookProvider": NoiseInjectionDetailerHookProvider,
+    "CoreMLDetailerHookProvider": CoreMLDetailerHookProvider,
 
     "BitwiseAndMask": BitwiseAndMask,
     "SubtractMask": SubtractMask,
@@ -262,6 +263,7 @@ NODE_CLASS_MAPPINGS = {
     "ImpactSetWidgetValue": ImpactSetWidgetValue,
     "ImpactNodeSetMuteState": ImpactNodeSetMuteState,
     "ImpactControlBridge": ImpactControlBridge,
+    "ImpactIsNotEmptySEGS": ImpactNotEmptySEGS,
 }
 
 
@@ -344,6 +346,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "ImpactMakeImageList": "Make Image List",
     "ImpactMakeImageBatch": "Make Image Batch",
     "ImpactStringSelector": "String Selector",
+    "ImpactIsNotEmptySEGS": "SEGS isn't Empty",
 
     "RemoveNoiseMask": "Remove Noise Mask",
 

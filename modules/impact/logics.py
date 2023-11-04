@@ -43,6 +43,20 @@ class ImpactCompare:
             return (False, )
 
 
+class ImpactNotEmptySEGS:
+    @classmethod
+    def INPUT_TYPES(cls):
+        return {"required": {"segs": ("SEGS",)}}
+
+    FUNCTION = "doit"
+    CATEGORY = "ImpactPack/Logic"
+
+    RETURN_TYPES = ("BOOLEAN", )
+
+    def doit(self, segs):
+        return (segs[1] != [], )
+
+
 class ImpactConditionalBranch:
     @classmethod
     def INPUT_TYPES(cls):
@@ -145,6 +159,9 @@ class ImpactValueSender:
                     "value": (any_typ, ),
                     "link_id": ("INT", {"default": 0, "min": 0, "max": sys.maxsize, "step": 1}),
                     },
+                "optional": {
+                        "signal_opt": (any_typ,),
+                    }
                 }
 
     OUTPUT_NODE = True
@@ -153,11 +170,12 @@ class ImpactValueSender:
 
     CATEGORY = "ImpactPack/Logic"
 
-    RETURN_TYPES = ()
+    RETURN_TYPES = (any_typ, )
+    RETURN_NAMES = ("signal", )
 
-    def doit(self, value, link_id=0):
+    def doit(self, value, link_id=0, signal_opt=None):
         PromptServer.instance.send_sync("value-send", {"link_id": link_id, "value": value})
-        return {}
+        return (signal_opt, )
 
 
 class ImpactIntConstSender:
@@ -361,7 +379,7 @@ try:
     sys.__comfyui_manager_register_message_collapse(filter_message)
 
 except Exception as e:
-    print(f"e: {e}")
+    print(f"[WARN] ComfyUI-Impact-Pack: `ComfyUI` or `ComfyUI-Manager` is an outdated version.")
     pass
 
 

@@ -1,7 +1,6 @@
 import os
 import sys
 
-import folder_paths
 import comfy.samplers
 import comfy.sd
 import warnings
@@ -31,15 +30,15 @@ warnings.filterwarnings('ignore', category=UserWarning, message='TypedStorage is
 model_path = folder_paths.models_dir
 
 
-# Nodes
 # folder_paths.supported_pt_extensions
-folder_paths.folder_names_and_paths["mmdets_bbox"] = ([os.path.join(model_path, "mmdets", "bbox")], folder_paths.supported_pt_extensions)
-folder_paths.folder_names_and_paths["mmdets_segm"] = ([os.path.join(model_path, "mmdets", "segm")], folder_paths.supported_pt_extensions)
-folder_paths.folder_names_and_paths["mmdets"] = ([os.path.join(model_path, "mmdets")], folder_paths.supported_pt_extensions)
-folder_paths.folder_names_and_paths["sams"] = ([os.path.join(model_path, "sams")], folder_paths.supported_pt_extensions)
-folder_paths.folder_names_and_paths["onnx"] = ([os.path.join(model_path, "onnx")], {'.onnx'})
+add_folder_path_and_extensions("mmdets_bbox", [os.path.join(model_path, "mmdets", "bbox")], folder_paths.supported_pt_extensions)
+add_folder_path_and_extensions("mmdets_segm", [os.path.join(model_path, "mmdets", "segm")], folder_paths.supported_pt_extensions)
+add_folder_path_and_extensions("mmdets", [os.path.join(model_path, "mmdets")], folder_paths.supported_pt_extensions)
+add_folder_path_and_extensions("sams", [os.path.join(model_path, "sams")], folder_paths.supported_pt_extensions)
+add_folder_path_and_extensions("onnx", [os.path.join(model_path, "onnx")], {'.onnx'})
 
 
+# Nodes
 class ONNXDetectorProvider:
     @classmethod
     def INPUT_TYPES(s):
@@ -373,7 +372,7 @@ class FaceDetailer:
 
         # make default prompt as 'face' if empty prompt for CLIPSeg
         bbox_detector.setAux('face')
-        segs = bbox_detector.detect(image, bbox_threshold, bbox_dilation, bbox_crop_factor, drop_size)
+        segs = bbox_detector.detect(image, bbox_threshold, bbox_dilation, bbox_crop_factor, drop_size, detailer_hook=detailer_hook)
         bbox_detector.setAux(None)
 
         # bbox + sam combination
@@ -385,7 +384,9 @@ class FaceDetailer:
 
         elif segm_detector is not None:
             segm_segs = segm_detector.detect(image, bbox_threshold, bbox_dilation, bbox_crop_factor, drop_size)
-            if hasattr(segm_detector, 'override_bbox_by_segm') and segm_detector.override_bbox_by_segm:
+
+            if (hasattr(segm_detector, 'override_bbox_by_segm') and segm_detector.override_bbox_by_segm and
+                    not (detailer_hook is not None and not hasattr(detailer_hook, 'override_bbox_by_segm'))):
                 segs = segm_segs
             else:
                 segm_mask = core.segs_to_combined_mask(segm_segs)
@@ -486,6 +487,21 @@ class NoiseInjectionDetailerHookProvider:
             print("[ERROR] NoiseInjectionDetailerHookProvider: 'ComfyUI Noise' custom node isn't installed. You must install 'BlenderNeko/ComfyUI Noise' extension to use this node.")
             print(f"\t{e}")
             pass
+
+
+class CoreMLDetailerHookProvider:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {"mode": (["Neural Engine", "CPU & GPU"], )}, }
+
+    RETURN_TYPES = ("DETAILER_HOOK",)
+    FUNCTION = "doit"
+
+    CATEGORY = "ImpactPack/Detailer"
+
+    def doit(self, mode):
+        hook = core.CoreMLHook(mode == "Neural Engine")
+        return (hook, )
 
 
 class CfgScheduleHookProvider:
@@ -1555,7 +1571,7 @@ class ImageReceiver:
                     mask = torch.zeros((64, 64), dtype=torch.float32, device="cpu")
                 return (image, mask.unsqueeze(0))
             except Exception as e:
-                print(f"[ComfyUI-Impact-Pack] ImageReceiver - invalid 'image_data'")
+                print(f"[WARN] ComfyUI-Impact-Pack: ImageReceiver - invalid 'image_data'")
                 mask = torch.zeros((64, 64), dtype=torch.float32, device="cpu")
                 return (empty_pil_tensor(64, 64), mask, )
         else:
@@ -1979,6 +1995,7 @@ class ImpactWildcardProcessor:
                         "populated_text": ("STRING", {"multiline": True, "dynamicPrompts": False}),
                         "mode": ("BOOLEAN", {"default": True, "label_on": "Populate", "label_off": "Fixed"}),
                         "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
+                        "Select to add Wildcard": (["Select the Wildcard to add to the text"] + impact.wildcards.get_wildcard_list(), ),
                     },
                 }
 
@@ -1987,7 +2004,8 @@ class ImpactWildcardProcessor:
     RETURN_TYPES = ("STRING", )
     FUNCTION = "doit"
 
-    def doit(self, wildcard_text, populated_text, mode, seed):
+    def doit(self, *args, **kwargs):
+        populated_text = kwargs['populated_text']
         return (populated_text, )
 
 
